@@ -10,6 +10,8 @@ import com.liu.dev.gameserver.support.io.FileTool;
 import com.liu.dev.gameserver.support.io.ZipTool;
 import com.liu.dev.gameserver.support.path.SafePaths;
 import com.liu.dev.gameserver.support.task.TaskService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -29,6 +31,8 @@ import java.util.zip.ZipFile;
  */
 @Service
 public class WorldService {
+
+    private static final Logger log = LoggerFactory.getLogger(WorldService.class);
 
     private static final String[] SIBLING_SUFFIXES = {"_nether", "_the_end"};
 
@@ -102,12 +106,14 @@ public class WorldService {
 
     public void activate(McServer s, String rawName) {
         String name = requireWorld(s, rawName);
+        log.info("伺服器「{}」改用地圖 {}", s.getName(), name);
         properties.set(s.getDirName(), "level-name", name);
     }
 
     public void delete(McServer s, String rawName) {
         String name = requireWorld(s, rawName);
         if (processes.isRunning(s.getId())) throw new BusinessException("請先停止伺服器再刪除地圖");
+        log.info("伺服器「{}」刪除地圖 {}", s.getName(), name);
         deleteMembers(s, name);
     }
 
@@ -125,6 +131,7 @@ public class WorldService {
         String name = requireWorld(s, rawName);
         Path serverDir = paths.serverDir(s.getDirName());
         List<String> members = members(serverDir, name);
+        log.info("伺服器「{}」匯出地圖 {}", s.getName(), name);
         return new DownloadSource() {
             @Override
             public String fileName() {
@@ -152,6 +159,7 @@ public class WorldService {
      */
     public String importZip(McServer s, Path zip, String requestedName, String fallbackName,
                             boolean overwrite, TaskService.Context ctx) {
+        log.info("正在匯入地圖{}.....至伺服器「{}」（覆蓋：{}）", zip, s.getName(), overwrite);
         Path serverDir = paths.serverDir(s.getDirName());
         List<Path> created = new ArrayList<>();
         try (ZipFile zf = ZipTool.open(zip)) {

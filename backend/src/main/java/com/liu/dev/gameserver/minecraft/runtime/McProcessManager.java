@@ -105,6 +105,7 @@ public class McProcessManager {
         if (mp == null || !mp.isAlive()) throw new BusinessException("伺服器目前沒有在執行");
         ConsoleChannel ch = hub.channelFor(s);
         if (mp.state() == ServerState.STOPPING) return mp.status();
+        log.info("正在停止伺服器「{}」（最多等 {} 秒）", s.getName(), stopTimeoutSeconds);
         beginStop(mp, ch);
         return mp.status();
     }
@@ -130,6 +131,7 @@ public class McProcessManager {
 
     /** 非同步重啟：先停止，等行程結束後再啟動。 */
     public void restart(McServer s) {
+        log.info("重新啟動伺服器「{}」", s.getName());
         ConsoleChannel ch = hub.channelFor(s);
         McProcess mp = processes.get(s.getId());
         if (mp == null || !mp.isAlive()) {
@@ -157,6 +159,7 @@ public class McProcessManager {
         McProcess mp = processes.get(s.getId());
         if (mp == null || !mp.isAlive()) throw new BusinessException("伺服器目前沒有在執行");
         mp.requestStop();
+        log.warn("強制終止伺服器「{}」（pid {}）", s.getName(), mp.process().pid());
         hub.channelFor(s).append("[Dev Console] 強制終止伺服器");
         mp.process().destroyForcibly();
     }
@@ -173,6 +176,7 @@ public class McProcessManager {
             stop(s);
             return;
         }
+        log.debug("伺服器「{}」收到指令：{}", s.getName(), cmd);
         ch.append("> " + cmd);
         if (!mp.sendLine(cmd)) throw new BusinessException("無法寫入伺服器（行程可能正在結束）");
     }

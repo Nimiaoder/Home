@@ -7,6 +7,8 @@ import com.liu.dev.gameserver.minecraft.server.McServerService;
 import com.liu.dev.gameserver.support.io.FileTool;
 import com.liu.dev.gameserver.support.task.TaskService;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,6 +22,8 @@ import java.util.Map;
 @RequestMapping("/api/minecraft/servers/{id}/mods")
 @PreAuthorize("hasRole('ADMIN')")
 public class ModController {
+
+    private static final Logger log = LoggerFactory.getLogger(ModController.class);
 
     /** 列表回傳：資料夾種類與檔案。 */
     public record ModList(String contentKind, String contentDir, List<ModService.ModFile> files) {}
@@ -44,6 +48,7 @@ public class ModController {
 
     @GetMapping
     public ApiResponse<ModList> list(@PathVariable long id) {
+        log.debug("*****ModController.list*****");
         McServer s = servers.require(id);
         return ApiResponse.ok(new ModList(s.getType().contentKind().name(), s.getType().contentDir(), mods.list(s)));
     }
@@ -52,6 +57,7 @@ public class ModController {
     @PostMapping("/upload")
     public ApiResponse<Void> upload(@PathVariable long id, @RequestParam String filename,
                                     HttpServletRequest request) throws IOException {
+        log.debug("*****ModController.upload*****");
         McServer s = servers.require(id);
         try (InputStream in = request.getInputStream()) {
             mods.upload(s, filename, in);
@@ -61,12 +67,14 @@ public class ModController {
 
     @PostMapping("/toggle")
     public ApiResponse<Void> toggle(@PathVariable long id, @RequestBody ToggleRequest req) {
+        log.debug("*****ModController.toggle*****");
         mods.toggle(servers.require(id), req.file(), req.enabled());
         return ApiResponse.ok(req.enabled() ? "已啟用（需重新啟動伺服器）" : "已停用（需重新啟動伺服器）", null);
     }
 
     @PostMapping("/delete")
     public ApiResponse<Void> delete(@PathVariable long id, @RequestBody FileRequest req) {
+        log.debug("*****ModController.delete*****");
         mods.delete(servers.require(id), req.file());
         return ApiResponse.ok("已刪除", null);
     }
@@ -75,13 +83,15 @@ public class ModController {
     public ApiResponse<ModrinthService.SearchResult> search(@PathVariable long id,
                                                             @RequestParam(defaultValue = "") String query,
                                                             @RequestParam(defaultValue = "0") int offset) {
+        log.debug("*****ModController.search*****");
         return ApiResponse.ok(modrinth.search(servers.require(id), query, offset));
     }
 
     @PostMapping("/install")
     public ApiResponse<Map<String, String>> install(@PathVariable long id, @RequestBody InstallRequest req) {
+        log.debug("*****ModController.install*****");
         McServer s = servers.require(id);
-        String taskId = tasks.submit("安裝 " + req.projectId(), ctx -> modrinth.install(s, req.projectId(), ctx));
+        String taskId = tasks.submit("mc:mods:" + id, "安裝 " + req.projectId(), ctx -> modrinth.install(s, req.projectId(), ctx));
         return ApiResponse.ok(Map.of("taskId", taskId));
     }
 }

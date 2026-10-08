@@ -11,6 +11,8 @@ import com.liu.dev.gameserver.support.download.DownloadTicket;
 import com.liu.dev.gameserver.support.io.FileTool;
 import com.liu.dev.gameserver.support.task.TaskService;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,6 +29,8 @@ import java.util.UUID;
 @RequestMapping("/api/minecraft/servers/{id}")
 @PreAuthorize("hasRole('ADMIN')")
 public class WorldController {
+
+    private static final Logger log = LoggerFactory.getLogger(WorldController.class);
 
     public record NameRequest(String name) {}
 
@@ -51,6 +55,7 @@ public class WorldController {
 
     @GetMapping("/worlds")
     public ApiResponse<List<WorldService.WorldInfo>> list(@PathVariable long id) {
+        log.debug("*****WorldController.list*****");
         return ApiResponse.ok(worlds.list(servers.require(id)));
     }
 
@@ -59,6 +64,7 @@ public class WorldController {
     public ApiResponse<Map<String, String>> upload(@PathVariable long id, @RequestParam String filename,
                                                    @RequestParam(required = false) String name,
                                                    HttpServletRequest request) throws IOException {
+        log.debug("*****WorldController.upload*****");
         McServer s = servers.require(id);
         if (!filename.toLowerCase().endsWith(".zip")) throw new BusinessException("請上傳 .zip 格式的地圖壓縮檔");
         String base = filename.substring(0, filename.length() - 4);
@@ -74,7 +80,7 @@ public class WorldController {
             Files.deleteIfExists(tmp);
             throw new BusinessException("收到的檔案是空的");
         }
-        String taskId = tasks.submit("匯入地圖 " + filename, ctx -> {
+        String taskId = tasks.submit("mc:worlds:" + id, "匯入地圖 " + filename, ctx -> {
             try {
                 worlds.importZip(s, tmp, name, base, false, ctx);
             } finally {
@@ -86,50 +92,58 @@ public class WorldController {
 
     @PostMapping("/worlds/activate")
     public ApiResponse<Void> activate(@PathVariable long id, @RequestBody NameRequest req) {
+        log.debug("*****WorldController.activate*****");
         worlds.activate(servers.require(id), req.name());
         return ApiResponse.ok("已設為使用中的地圖（重新啟動後生效）", null);
     }
 
     @PostMapping("/worlds/delete")
     public ApiResponse<Void> delete(@PathVariable long id, @RequestBody NameRequest req) {
+        log.debug("*****WorldController.delete*****");
         worlds.delete(servers.require(id), req.name());
         return ApiResponse.ok("地圖已刪除", null);
     }
 
     @PostMapping("/worlds/export")
     public ApiResponse<DownloadTicket> export(@PathVariable long id, @RequestBody NameRequest req) {
+        log.debug("*****WorldController.export*****");
         DownloadSource src = worlds.exportSource(servers.require(id), req.name());
         return ApiResponse.ok(new DownloadTicket(downloads.issue(src), src.fileName()));
     }
 
     @PostMapping("/worlds/backup")
     public ApiResponse<Map<String, String>> backup(@PathVariable long id, @RequestBody NameRequest req) {
+        log.debug("*****WorldController.backup*****");
         McServer s = servers.require(id);
         String world = worlds.requireWorld(s, req.name());
-        String taskId = tasks.submit("備份地圖 " + world, ctx -> backups.backup(s, world, null, ctx));
+        String taskId = tasks.submit("mc:worlds:" + id, "備份地圖 " + world, ctx -> backups.backup(s, world, null, ctx));
         return ApiResponse.ok(Map.of("taskId", taskId));
     }
 
     @GetMapping("/backups")
     public ApiResponse<List<BackupService.BackupInfo>> backups(@PathVariable long id) {
+        log.debug("*****WorldController.backups*****");
         return ApiResponse.ok(backups.list(servers.require(id)));
     }
 
     @PostMapping("/backups/restore")
     public ApiResponse<Map<String, String>> restore(@PathVariable long id, @RequestBody FileRequest req) {
+        log.debug("*****WorldController.restore*****");
         McServer s = servers.require(id);
-        String taskId = tasks.submit("還原備份 " + req.file(), ctx -> backups.restore(s, req.file(), ctx));
+        String taskId = tasks.submit("mc:worlds:" + id, "還原備份 " + req.file(), ctx -> backups.restore(s, req.file(), ctx));
         return ApiResponse.ok(Map.of("taskId", taskId));
     }
 
     @PostMapping("/backups/delete")
     public ApiResponse<Void> deleteBackup(@PathVariable long id, @RequestBody FileRequest req) {
+        log.debug("*****WorldController.deleteBackup*****");
         backups.delete(servers.require(id), req.file());
         return ApiResponse.ok("備份已刪除", null);
     }
 
     @PostMapping("/backups/download")
     public ApiResponse<DownloadTicket> downloadBackup(@PathVariable long id, @RequestBody FileRequest req) {
+        log.debug("*****WorldController.downloadBackup*****");
         DownloadSource src = backups.downloadSource(servers.require(id), req.file());
         return ApiResponse.ok(new DownloadTicket(downloads.issue(src), src.fileName()));
     }

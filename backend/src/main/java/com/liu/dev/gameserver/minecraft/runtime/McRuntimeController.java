@@ -9,6 +9,8 @@ import com.liu.dev.gameserver.support.download.DownloadService;
 import com.liu.dev.gameserver.support.download.DownloadSource;
 import com.liu.dev.gameserver.support.download.DownloadTicket;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +25,8 @@ import java.nio.file.Path;
 @RequestMapping("/api/minecraft/servers/{id}")
 @PreAuthorize("hasRole('ADMIN')")
 public class McRuntimeController {
+
+    private static final Logger log = LoggerFactory.getLogger(McRuntimeController.class);
 
     public record PowerRequest(String action) {}
 
@@ -45,6 +49,7 @@ public class McRuntimeController {
 
     @GetMapping("/status")
     public ApiResponse<RuntimeStatus> status(@PathVariable long id) {
+        log.debug("*****McRuntimeController.status*****");
         servers.require(id);
         return ApiResponse.ok(processes.status(id));
     }
@@ -52,6 +57,7 @@ public class McRuntimeController {
     /** action：start / stop / restart / kill */
     @PostMapping("/power")
     public ApiResponse<RuntimeStatus> power(@PathVariable long id, @RequestBody PowerRequest req) {
+        log.debug("*****McRuntimeController.power*****");
         McServer s = servers.require(id);
         String action = req.action() == null ? "" : req.action().toLowerCase();
         switch (action) {
@@ -66,6 +72,7 @@ public class McRuntimeController {
 
     @PostMapping("/console/command")
     public ApiResponse<Void> command(@PathVariable long id, @RequestBody CommandRequest req) {
+        log.debug("*****McRuntimeController.command*****");
         processes.sendCommand(servers.require(id), req.command());
         return ApiResponse.ok();
     }
@@ -79,6 +86,7 @@ public class McRuntimeController {
                              @RequestParam(defaultValue = "0") long after,
                              @RequestParam(defaultValue = "0") long epoch,
                              HttpServletResponse response) {
+        log.debug("*****McRuntimeController.stream*****");
         response.setHeader("Cache-Control", "no-cache");
         response.setHeader("X-Accel-Buffering", "no");          // 避免 Nginx / Synology 反向代理緩衝，造成延遲
         try {
@@ -100,6 +108,7 @@ public class McRuntimeController {
     /** 下載 logs/latest.log。 */
     @PostMapping("/logs/download")
     public ApiResponse<DownloadTicket> downloadLog(@PathVariable long id) {
+        log.debug("*****McRuntimeController.downloadLog*****");
         McServer s = servers.require(id);
         Path log = paths.serverDir(s.getDirName()).resolve("logs").resolve("latest.log");
         if (!Files.isRegularFile(log)) throw new BusinessException("目前沒有 latest.log（伺服器還沒啟動過）");

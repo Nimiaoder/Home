@@ -1,15 +1,18 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import gameServerRoutes from '@/modules/gameserver/routes'
+import { logger } from '@/utils/logger'
+
+const log = logger('router')
 
 const routes = [
-  { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { public: true } },
+  { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { public: true, title: '登入' } },
   {
     // 登入後的頁面都放在 AppShell（共用頂部列）底下
     path: '/',
     component: () => import('@/layouts/AppShell.vue'),
     children: [
-      { path: '', name: 'home', component: () => import('@/views/HomeView.vue') },
+      { path: '', name: 'home', component: () => import('@/views/HomeView.vue'), meta: { title: '主頁' } },
       // 新增功能分類：把它的 routes 展開在這裡（meta.roles 可限制角色）
       ...gameServerRoutes
     ]
@@ -19,13 +22,26 @@ const routes = [
 
 const router = createRouter({ history: createWebHistory(), routes })
 
-router.beforeEach((to) => {
+router.beforeEach((to, from) => {
+  log.debug('*****導覽*****', from.fullPath, '→', to.fullPath)
   const auth = useAuthStore()
-  if (!to.meta.public && !auth.isLoggedIn) return { name: 'login', query: { redirect: to.fullPath } }
+  if (!to.meta.public && !auth.isLoggedIn) {
+    log.info('尚未登入，導向登入頁', to.fullPath)
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
   if (to.name === 'login' && auth.isLoggedIn) return { name: 'home' }
   // 角色限制：任何一層 route 設了 meta.roles 且目前角色不在其中，就回首頁
   const role = auth.user?.role
-  if (to.matched.some((r) => r.meta.roles && !r.meta.roles.includes(role))) return { name: 'home' }
+  if (to.matched.some((r) => r.meta.roles && !r.meta.roles.includes(role))) {
+    log.warn('角色', role, '沒有權限進入', to.fullPath)
+    return { name: 'home' }
+  }
+})
+
+// 瀏覽器分頁標題跟著目前頁面走（取最內層有設定 title 的路由）
+router.afterEach((to) => {
+  const title = [...to.matched].reverse().find((r) => r.meta.title)?.meta.title
+  document.title = title ? `${title} · Home` : 'Home'
 })
 
 export default router

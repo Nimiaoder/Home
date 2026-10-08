@@ -8,6 +8,11 @@ export function formatBytes(n) {
   return `${v >= 100 ? v.toFixed(0) : v.toFixed(1)} ${units[i]}`
 }
 
+/** 下載速率，例如 3.2 MB/s；沒有速率時回傳空字串。 */
+export function formatSpeed(bytesPerSecond) {
+  return bytesPerSecond > 0 ? `${formatBytes(bytesPerSecond)}/s` : ''
+}
+
 export function formatDate(ms) {
   if (!ms) return '-'
   const d = new Date(ms)

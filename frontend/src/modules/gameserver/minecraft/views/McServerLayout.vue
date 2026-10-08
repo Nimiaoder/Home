@@ -12,6 +12,10 @@ import { usePower } from '../composables/usePower'
 import { provideServer } from '../composables/useServerContext'
 import { isAlive } from '../constants'
 import { toast } from '@/utils/toast'
+import { logger } from '@/utils/logger'
+
+const log = logger('McServerLayout')
+log.debug('*****McServerLayout*****')
 
 // 單一伺服器的外框：標題 + 電源按鈕 + 分頁。資料每 3 秒更新一次，並透過 provide 分享給各分頁。
 const route = useRoute()
@@ -87,7 +91,7 @@ function retry() {
 
       <div v-if="server.installState === 'INSTALLING'" class="notice stack banner">
         <strong>正在下載並安裝伺服器檔案…</strong>
-        <ProgressBar :percent="install.percent" :label="install.message" />
+        <ProgressBar :percent="install.percent" :done="install.bytesDone" :total="install.bytesTotal" :speed="install.speed" :label="install.message" />
       </div>
       <div v-else-if="server.installState === 'FAILED'" class="notice err banner">
         <div><strong>安裝失敗</strong>：{{ server.installError }}</div>

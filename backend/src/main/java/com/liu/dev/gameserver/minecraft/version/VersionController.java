@@ -6,6 +6,8 @@ import com.liu.dev.gameserver.minecraft.java.JavaRequirement;
 import com.liu.dev.gameserver.minecraft.version.provider.ProviderRegistry;
 import com.liu.dev.gameserver.minecraft.version.provider.ServerProvider;
 import com.liu.dev.gameserver.support.task.TaskService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,6 +20,8 @@ import java.util.Map;
 @RequestMapping("/api/minecraft")
 @PreAuthorize("hasRole('ADMIN')")
 public class VersionController {
+
+    private static final Logger log = LoggerFactory.getLogger(VersionController.class);
 
     /** 伺服器類型說明，供前端選單使用。 */
     public record TypeInfo(ServerType type, String name, String contentKind) {}
@@ -39,12 +43,14 @@ public class VersionController {
 
     @GetMapping("/types")
     public ApiResponse<List<TypeInfo>> types() {
+        log.debug("*****VersionController.types*****");
         return ApiResponse.ok(Arrays.stream(ServerType.values())
                 .map(t -> new TypeInfo(t, t.displayName(), t.contentKind().name())).toList());
     }
 
     @GetMapping("/versions")
     public ApiResponse<List<VersionView>> versions(@RequestParam ServerType type) {
+        log.debug("*****VersionController.versions*****");
         ServerProvider p = providers.get(type);
         return ApiResponse.ok(p.versions().stream()
                 .map(v -> new VersionView(v.id(), v.kind(), v.releasedAt(), JavaRequirement.forMinecraft(v.id())))
@@ -53,25 +59,29 @@ public class VersionController {
 
     @GetMapping("/versions/builds")
     public ApiResponse<List<BuildOption>> builds(@RequestParam ServerType type, @RequestParam String mcVersion) {
+        log.debug("*****VersionController.builds*****");
         return ApiResponse.ok(providers.get(type).builds(mcVersion));
     }
 
     @GetMapping("/library")
     public ApiResponse<List<LibraryService.Entry>> library() {
+        log.debug("*****VersionController.library*****");
         return ApiResponse.ok(library.list());
     }
 
     @PostMapping("/library/download")
     public ApiResponse<Map<String, String>> download(@RequestBody LibraryRequest req) {
+        log.debug("*****VersionController.download*****");
         if (req.type() == null || req.mcVersion() == null) throw new BusinessException("請選擇類型與版本");
         LibraryService.validateNames(req.mcVersion(), req.build());
-        String taskId = tasks.submit("下載 " + req.type().displayName() + " " + req.mcVersion(),
+        String taskId = tasks.submit("mc:library", "下載 " + req.type().displayName() + " " + req.mcVersion(),
                 ctx -> library.ensureDownloaded(req.type(), req.mcVersion(), req.build(), ctx, 2, 98));
         return ApiResponse.ok(Map.of("taskId", taskId));
     }
 
     @PostMapping("/library/delete")
     public ApiResponse<Void> delete(@RequestBody LibraryRequest req) {
+        log.debug("*****VersionController.delete*****");
         if (req.type() == null || req.mcVersion() == null || req.build() == null) throw new BusinessException("參數不完整");
         library.delete(req.type(), req.mcVersion(), req.build());
         return ApiResponse.ok("已從版本庫刪除", null);

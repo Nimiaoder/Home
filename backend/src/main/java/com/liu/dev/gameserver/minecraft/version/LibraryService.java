@@ -8,6 +8,8 @@ import com.liu.dev.gameserver.support.http.HttpFetcher;
 import com.liu.dev.gameserver.support.io.FileTool;
 import com.liu.dev.gameserver.support.path.SafePaths;
 import com.liu.dev.gameserver.support.task.TaskService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -27,6 +29,8 @@ import java.util.stream.Stream;
  */
 @Service
 public class LibraryService {
+
+    private static final Logger log = LoggerFactory.getLogger(LibraryService.class);
 
     /** 版本庫中的一筆檔案。 */
     public record Entry(ServerType type, String mcVersion, String build, String fileName, long sizeBytes, long modifiedAt) {}
@@ -114,18 +118,23 @@ public class LibraryService {
         Optional<Path> cached = findCached(type, mcVersion, b);
         if (cached.isPresent()) return new Cached(b, cached.get());
 
+        log.info("版本庫沒有 {} {}（{}），準備下載", type, mcVersion, b);
         c.progress(fromPercent, "解析 " + type.displayName() + " " + mcVersion + " 的下載位置…");
         Artifact a = provider.resolve(mcVersion, b);
         String fileName = safeFileName(a.fileName());
         Path target = paths.libraryDir(type.name(), mcVersion, b).resolve(fileName);
+        c.progress(fromPercent, "下載 " + fileName);
         http.download(a.url(), target, a.hashAlgo(), a.hash(), (done, total) -> {
+            c.transfer(done, total);
             int pct = total > 0 ? fromPercent + (int) ((toPercent - fromPercent) * done / total) : -1;
-            c.progress(pct, "下載 " + fileName + "　" + mb(done) + (total > 0 ? " / " + mb(total) : ""));
+            c.progress(pct, null);
         });
+        c.clearTransfer();
         return new Cached(b, target);
     }
 
     public void delete(ServerType type, String mcVersion, String build) {
+        log.info("從版本庫刪除 {} {}（{}）", type, mcVersion, build);
         Path dir = paths.libraryDir(type.name(), mcVersion, build);
         if (!Files.isDirectory(dir)) throw new BusinessException("版本庫中沒有這個版本");
         try {
@@ -141,10 +150,6 @@ public class LibraryService {
         String n = name == null ? "" : Paths.get(name).getFileName().toString();
         n = n.replaceAll("[^\\p{L}\\p{N}_.+\\-]", "_");
         return n.isBlank() || n.startsWith(".") ? "server.jar" : n;
-    }
-
-    private static String mb(long bytes) {
-        return String.format("%.1f MB", bytes / 1024.0 / 1024.0);
     }
 
     /** 驗證 mcVersion / build 可安全當成資料夾名稱（API 入口使用）。 */

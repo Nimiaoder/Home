@@ -1,5 +1,8 @@
 import http from './http'
 import { toast } from '@/utils/toast'
+import { logger } from '@/utils/logger'
+
+const log = logger('request')
 
 export const MSG_NETWORK = '伺服器請求失敗，請稍後再試'
 export const MSG_TIMEOUT = '伺服器回應逾時，請稍後再試'
@@ -41,6 +44,8 @@ async function request(method, url, reqBody, callBack, options = {}) {
   const { showSuccess = false, showError = true, onError, onFinally, axios: axiosConfig = {} } = options
 
   let body
+  const startedAt = performance.now()
+  log.debug(`→ ${method.toUpperCase()} ${url}`)
   try {
     const res = await http.request({
       method,
@@ -49,8 +54,10 @@ async function request(method, url, reqBody, callBack, options = {}) {
       ...axiosConfig
     })
     body = res.data
+    log.debug(`← ${res.status} ${url}（${Math.round(performance.now() - startedAt)} ms）`)
   } catch (err) {
     body = normalizeError(err)
+    log.warn(`✗ ${method.toUpperCase()} ${url}：${body.message}`)
   }
 
   try {

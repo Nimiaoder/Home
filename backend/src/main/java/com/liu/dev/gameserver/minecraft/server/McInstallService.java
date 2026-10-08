@@ -77,7 +77,8 @@ public class McInstallService {
         s.setInstallError(null);
         repo.save(s);
         String title = "安裝 " + type.displayName() + " " + mcVersion;
-        String taskId = tasks.submit(title, ctx -> run(serverId, type, mcVersion, build, backupFirst && wasReady, wasReady, initial, ctx));
+        log.info("開始安裝伺服器 {}：{} {}（備份地圖：{}）", serverId, type, mcVersion, backupFirst && wasReady);
+        String taskId = tasks.submit("mc:server:" + serverId, title, ctx -> run(serverId, type, mcVersion, build, backupFirst && wasReady, wasReady, initial, ctx));
         activeTasks.put(serverId, taskId);
         return taskId;
     }
@@ -100,6 +101,7 @@ public class McInstallService {
             if (provider.needsJavaToInstall()) {
                 javaExe = javaService.resolve(s.getJavaPath(), JavaRequirement.forMinecraft(mcVersion)).path();
             }
+            log.info("正在安裝{}.....至{}", cached.file(), dir);
             ctx.progress(72, "安裝中…");
             touched = true;
             provider.install(new InstallContext(dir, cached.file(), javaExe, line -> ctx.message(line)));
@@ -119,6 +121,7 @@ public class McInstallService {
             entry.setBuild(cached.build());
             entry.setAction(initial ? "INSTALL" : "CHANGE");
             logs.save(entry);
+            log.info("伺服器 {} 安裝完成：{} {}（{}）", serverId, type, mcVersion, cached.build());
             ctx.progress(100, "安裝完成");
         } catch (Throwable e) {
             String msg = e instanceof BusinessException ? e.getMessage() : "未預期的錯誤：" + FileTool.msg(e);

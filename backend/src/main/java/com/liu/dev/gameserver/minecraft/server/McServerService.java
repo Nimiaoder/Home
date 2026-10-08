@@ -12,6 +12,8 @@ import com.liu.dev.gameserver.minecraft.version.ServerType;
 import com.liu.dev.gameserver.minecraft.version.provider.ProviderRegistry;
 import com.liu.dev.gameserver.minecraft.version.provider.ServerProvider;
 import com.liu.dev.gameserver.support.io.FileTool;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -27,6 +29,8 @@ import java.util.Map;
 /** 伺服器的建立 / 修改 / 刪除 / 查詢。 */
 @Service
 public class McServerService {
+
+    private static final Logger log = LoggerFactory.getLogger(McServerService.class);
 
     private static final int DEFAULT_PORT = 25565;
 
@@ -129,6 +133,8 @@ public class McServerService {
                     + "（請確認 " + paths.base() + " 存在且程式有寫入權限）");
         }
         s = repo.save(s);
+        log.info("已建立伺服器「{}」（id={}，{} {}，連接埠 {}，記憶體 {} MB，目錄 {}）",
+                s.getName(), s.getId(), req.type(), mc, port, memory, dir);
         installer.installAsync(s.getId(), req.type(), mc, req.build(), false, true);
         return view(repo.findById(s.getId()).orElse(s));
     }
@@ -151,6 +157,7 @@ public class McServerService {
         if (req.jvmArgs() != null) s.setJvmArgs(cleanJvmArgs(req.jvmArgs()));
         if (req.autoStart() != null) s.setAutoStart(req.autoStart());
         repo.save(s);
+        log.info("已更新伺服器「{}」（id={}）的設定", s.getName(), id);
         if (!processes.isRunning(id) && s.getInstallState() == InstallState.READY) {
             properties.set(s.getDirName(), "server-port", String.valueOf(s.getPort()));
         }
@@ -159,6 +166,7 @@ public class McServerService {
 
     public void acceptEula(long id) {
         McServer s = require(id);
+        log.info("伺服器「{}」（id={}）同意 EULA", s.getName(), id);
         try {
             EulaFile.accept(paths.serverDir(s.getDirName()));
         } catch (IOException e) {
@@ -177,12 +185,14 @@ public class McServerService {
         if (provider.versions().stream().noneMatch(v -> v.id().equals(mc))) {
             throw new BusinessException(req.type().displayName() + " 沒有 Minecraft " + mc + " 這個版本");
         }
+        log.info("伺服器「{}」（id={}）切換版本：{} {} {}", s.getName(), id, req.type(), mc, req.build());
         return installer.installAsync(s.getId(), req.type(), mc, req.build(), !Boolean.FALSE.equals(req.backupFirst()), false);
     }
 
     /** 安裝失敗後，以目前記錄的版本重新安裝。 */
     public String retryInstall(long id) {
         McServer s = require(id);
+        log.info("伺服器「{}」（id={}）重新安裝 {} {}", s.getName(), id, s.getType(), s.getMcVersion());
         return installer.installAsync(id, s.getType(), s.getMcVersion(), s.getBuild(), false, true);
     }
 
@@ -192,6 +202,7 @@ public class McServerService {
         McServer s = require(id);
         if (processes.isRunning(id)) throw new BusinessException("請先停止伺服器再刪除");
         if (installer.activeTaskId(id) != null) throw new BusinessException("伺服器正在安裝中，請稍後再刪除");
+        log.info("刪除伺服器「{}」（id={}），同時刪除檔案：{}", s.getName(), id, deleteFiles);
         hub.remove(id);
         logs.deleteByServerId(id);
         repo.delete(s);

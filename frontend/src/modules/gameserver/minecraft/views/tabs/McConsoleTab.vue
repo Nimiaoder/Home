@@ -6,6 +6,10 @@ import { useConsoleStream } from '../../composables/useConsoleStream'
 import { mcServerApi } from '@/api/minecraft'
 import { downloadByTicket } from '@/utils/download'
 import { isAlive, QUICK_COMMANDS } from '../../constants'
+import { logger } from '@/utils/logger'
+
+const logr = logger('McConsoleTab')
+logr.debug('*****McConsoleTab*****')
 
 const { server, id, reload } = useServer()
 const { lines, status, connected, fatal, clear } = useConsoleStream(() => id.value)

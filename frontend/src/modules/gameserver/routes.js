@@ -6,7 +6,7 @@ export default [
     path: 'games',
     name: 'games',
     component: () => import('./GameServerView.vue'),
-    meta: { roles: ['ADMIN'] }
+    meta: { roles: ['ADMIN'], title: '遊戲伺服器' }
   },
   ...minecraftRoutes
 ]

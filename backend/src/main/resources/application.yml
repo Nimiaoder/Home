@@ -29,8 +29,6 @@ app:
   minecraft:
     # 所有 Minecraft 相關檔案的根目錄（servers/ library/ backups/ java/ tmp/ 都在底下）
     base-dir: ${MC_BASE_DIR:/volume1/LiuChenWei/Home/GameServer/Minecraft}
-    # 額外搜尋 Java 的位置（逗號分隔）；<base-dir>/java 一律會被搜尋
-    java-search-dirs: ${MC_JAVA_SEARCH_DIRS:/usr/lib/jvm,/usr/java,/opt/java,/var/packages}
     stop-timeout-seconds: ${MC_STOP_TIMEOUT:60}
     console-buffer-lines: 2000
     # PaperMC 等服務要求 User-Agent 帶聯絡資訊，請改成自己的網址或 Email

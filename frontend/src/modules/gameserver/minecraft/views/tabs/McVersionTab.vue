@@ -7,6 +7,7 @@ import JavaRequirementNotice from '../../components/JavaRequirementNotice.vue'
 import { useServer } from '../../composables/useServerContext'
 import { useTaskRunner } from '@/composables/useTask'
 import { mcServerApi } from '@/api/minecraft'
+import { logger } from '@/utils/logger'
 import { confirmDialog } from '@/utils/confirm'
 import { formatDate } from '@/utils/format'
 import { isAlive } from '../../constants'
@@ -20,10 +21,14 @@ const pick = ref({ type: server.value.type, mcVersion: server.value.mcVersion, b
 const requiredJava = ref(0)
 const backupFirst = ref(true)
 const history = ref([])
+const log = logger('McVersionTab')
 const { state: task, track } = useTaskRunner()
 
 const loadHistory = () => mcServerApi.history(id.value, (d) => (history.value = d))
-onMounted(loadHistory)
+onMounted(() => {
+  log.debug('*****McVersionTab*****')
+  loadHistory()
+})
 
 const unchanged = computed(() =>
   pick.value.type === server.value.type && pick.value.mcVersion === server.value.mcVersion &&
@@ -53,6 +58,7 @@ async function apply() {
     confirmText: '開始切換', danger: downgrade
   })
   if (!ok) return
+  log.info('切換版本', pick.value.type, pick.value.mcVersion, pick.value.build)
   mcServerApi.changeVersion(id.value, { ...pick.value, backupFirst: backupFirst.value }, (d) => {
     reload()
     track(d.taskId, { title: '切換版本', onDone: () => { toast.success('版本已切換'); reload(); loadHistory() }, onFail: reload })
@@ -77,14 +83,14 @@ async function apply() {
       <VersionPicker v-model="pick" @java="requiredJava = $event" />
       <JavaRequirementNotice :required="requiredJava" :java-path="server.javaPath" />
       <label class="check"><input v-model="backupFirst" type="checkbox" /> 切換前先備份目前使用中的地圖（建議）</label>
-      <ProgressBar v-if="task.active" :percent="task.percent" :label="task.message || task.title" />
+      <ProgressBar v-if="task.active" :percent="task.percent" :done="task.bytesDone" :total="task.bytesTotal" :speed="task.speed" :label="task.message || task.title" />
       <div class="row">
         <button class="btn sm" :disabled="alive || installing || task.active || unchanged || !pick.mcVersion" @click="apply">
           <AppIcon name="tag" :size="15" /> 套用版本
         </button>
         <RouterLink :to="{ name: 'mc-library' }" class="small muted lnk">管理版本庫 →</RouterLink>
       </div>
-      <p class="muted small">核心會先下載到共用版本庫（已下載過的版本不會重抓），再複製到這個伺服器。地圖、設定、模組都不會被刪除。</p>
+      <p class="muted small">核心會先下載到版本庫再複製到此伺服器，地圖、設定與模組不受影響。</p>
     </section>
 
     <section class="card">

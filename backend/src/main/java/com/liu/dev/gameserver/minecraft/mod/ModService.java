@@ -6,6 +6,8 @@ import com.liu.dev.gameserver.minecraft.storage.MinecraftPaths;
 import com.liu.dev.gameserver.minecraft.version.ServerType;
 import com.liu.dev.gameserver.support.io.FileTool;
 import com.liu.dev.gameserver.support.path.SafePaths;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -20,6 +22,8 @@ import java.util.zip.ZipFile;
 /** 模組 / 插件檔案管理（mods/ 或 plugins/）。停用的檔案會改名為 *.jar.disabled。 */
 @Service
 public class ModService {
+
+    private static final Logger log = LoggerFactory.getLogger(ModService.class);
 
     private static final String DISABLED = ".disabled";
 
@@ -79,6 +83,7 @@ public class ModService {
         Path dir = contentDir(s);
         String fn = SafePaths.requireName(filename, "檔名");
         if (!fn.toLowerCase().endsWith(".jar")) throw new BusinessException("只能上傳 .jar 檔案");
+        log.info("正在儲存上傳的 {} 至 {}", fn, dir);
         Files.createDirectories(dir);
         Files.createDirectories(paths.tmp());
         Path tmp = paths.tmp().resolve("mod-" + UUID.randomUUID() + ".jar");
@@ -105,6 +110,7 @@ public class ModService {
                 ? f.resolveSibling(fn.substring(0, fn.length() - DISABLED.length()))
                 : f.resolveSibling(fn + DISABLED);
         if (Files.exists(target)) throw new BusinessException("已經有同名的檔案：" + target.getFileName());
+        log.info("{} {}", enable ? "啟用" : "停用", fn);
         try {
             Files.move(f, target);
         } catch (IOException e) {
@@ -114,7 +120,9 @@ public class ModService {
 
     public void delete(McServer s, String rawFile) {
         try {
-            Files.delete(resolve(s, rawFile));
+            Path target = resolve(s, rawFile);
+            log.info("刪除 {}", target);
+            Files.delete(target);
         } catch (IOException e) {
             throw new BusinessException("刪除失敗：" + FileTool.msg(e));
         }

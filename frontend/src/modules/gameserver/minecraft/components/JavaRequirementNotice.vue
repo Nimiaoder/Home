@@ -15,9 +15,9 @@ const ok = computed(() => !list.value || !props.required || !!props.javaPath || 
   <div v-if="required" :class="['notice small', ok ? 'ok' : 'warn']">
     <template v-if="ok">此版本需要 Java {{ required }} 以上。</template>
     <template v-else>
-      此版本需要 Java {{ required }} 以上，但系統上找不到。請先到
+      此版本需要 Java {{ required }} 以上，但 java/ 資料夾裡沒有。請先到
       <RouterLink :to="{ name: 'mc-library', query: { tab: 'java' } }" class="lnk">資源庫 → Java 環境</RouterLink>
-      一鍵下載安裝。
+      下載安裝。
     </template>
   </div>
 </template>

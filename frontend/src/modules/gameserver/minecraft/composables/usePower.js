@@ -1,6 +1,9 @@
 import { ref } from 'vue'
 import { mcServerApi } from '@/api/minecraft'
 import { confirmDialog } from '@/utils/confirm'
+import { logger } from '@/utils/logger'
+
+const log = logger('usePower')
 
 const CONFIRMS = {
   stop: { title: '停止伺服器', message: '會先通知玩家並儲存地圖，再正常關閉。', confirmText: '停止' },
@@ -24,6 +27,7 @@ export function usePower(getServer, onDone) {
       const { ok } = await confirmDialog(conf)
       if (!ok) return
     }
+    log.info('電源操作', action, s.name)
     busy.value = true
     mcServerApi.power(s.id, action, () => onDone?.(), { onFinally: () => (busy.value = false) })
   }

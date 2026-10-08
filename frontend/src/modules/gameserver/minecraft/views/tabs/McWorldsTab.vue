@@ -8,6 +8,8 @@ import UploadButton from '@/components/ui/UploadButton.vue'
 import { useServer } from '../../composables/useServerContext'
 import { useTaskRunner } from '@/composables/useTask'
 import { mcWorldApi } from '@/api/minecraft'
+import { taskScope } from '@/api/tasks'
+import { logger } from '@/utils/logger'
 import { confirmDialog } from '@/utils/confirm'
 import { downloadByTicket } from '@/utils/download'
 import { formatBytes, formatDate } from '@/utils/format'
@@ -19,13 +21,19 @@ const alive = computed(() => isAlive(server.value))
 
 const worlds = ref([])
 const backups = ref([])
-const { state: task, track } = useTaskRunner()
+const log = logger('McWorldsTab')
+const { state: task, track, resume } = useTaskRunner()
 
 function load() {
   mcWorldApi.list(id.value, (d) => (worlds.value = d))
   mcWorldApi.backups(id.value, (d) => (backups.value = d))
 }
-onMounted(load)
+onMounted(() => {
+  log.debug('*****McWorldsTab*****')
+  load()
+  // 重新整理頁面後，接回後端還在進行的匯入、備份或還原
+  resume(taskScope.worlds(id.value), { onDone: (t) => { toast.success(`${t.title} 完成`); load() } })
+})
 
 // ---- 匯入地圖 ----
 const pendingFile = ref(null)
@@ -41,6 +49,7 @@ function pick(file) {
 function doImport() {
   const file = pendingFile.value
   pendingFile.value = null
+  log.info('匯入地圖', file.name, formatBytes(file.size))
   uploading.value = true
   uploadPct.value = 0
   mcWorldApi.upload(id.value, file, importName.value.trim(), (d) => {
@@ -52,6 +61,7 @@ function doImport() {
 const activate = (w) => mcWorldApi.activate(id.value, w.name, load, { showSuccess: true })
 
 function backup(w) {
+  log.info('備份地圖', w.name)
   mcWorldApi.backup(id.value, w.name, (d) =>
     track(d.taskId, { title: `備份 ${w.name}`, onDone: () => { toast.success('備份完成'); load() } }))
 }
@@ -87,6 +97,7 @@ async function restore(b) {
     confirmText: '還原'
   })
   if (!ok) return
+  log.info('還原備份', b.fileName)
   mcWorldApi.restore(id.value, b.fileName, (d) =>
     track(d.taskId, { title: `還原 ${b.world}`, onDone: () => { toast.success('已還原'); load() } }))
 }
@@ -108,11 +119,11 @@ async function removeBackup(b) {
       </div>
       <div v-if="uploading || task.active" class="prog">
         <ProgressBar v-if="uploading" :percent="uploadPct" :label="`上傳中 ${uploadPct}%`" />
-        <ProgressBar v-else :percent="task.percent" :label="task.message || task.title" />
+        <ProgressBar v-else :percent="task.percent" :done="task.bytesDone" :total="task.bytesTotal" :speed="task.speed" :label="task.message || task.title" />
       </div>
 
       <EmptyState v-if="!worlds.length" icon="globe" title="還沒有地圖"
-                  hint="伺服器第一次啟動後會自動產生地圖；你也可以匯入既有的地圖壓縮檔（需包含 level.dat）。" />
+                  hint="第一次啟動伺服器後會產生地圖，也可以匯入 .zip 地圖（需含 level.dat）。" />
       <div v-else class="table-wrap">
         <table class="table">
           <thead><tr><th>名稱</th><th>大小</th><th>最後修改</th><th /></tr></thead>
@@ -143,7 +154,7 @@ async function removeBackup(b) {
 
     <section class="card">
       <div class="head"><h3 class="section-title" style="margin:0">備份（{{ backups.length }}）</h3></div>
-      <EmptyState v-if="!backups.length" icon="archive" title="還沒有備份" hint="在上方地圖按「備份」即可，執行中的伺服器也能備份。" />
+      <EmptyState v-if="!backups.length" icon="archive" title="還沒有備份" hint="在上方的地圖按「備份」建立，伺服器執行中也可以。" />
       <div v-else class="table-wrap">
         <table class="table">
           <thead><tr><th>地圖</th><th>備份時間</th><th>大小</th><th /></tr></thead>
@@ -173,7 +184,7 @@ async function removeBackup(b) {
         <p class="small muted">檔案：{{ pendingFile?.name }}（{{ formatBytes(pendingFile?.size) }}）</p>
         <div class="form-field">
           <label>地圖名稱（選填）</label>
-          <input v-model="importName" class="input" placeholder="留空則沿用壓縮檔內的資料夾名稱" @keyup.enter="doImport" />
+          <input v-model="importName" class="input" placeholder="留空則使用壓縮檔內的資料夾名稱" @keyup.enter="doImport" />
           <span class="hint">匯入後可在列表按「設為使用中」，重新啟動就會載入這張地圖。</span>
         </div>
       </div>

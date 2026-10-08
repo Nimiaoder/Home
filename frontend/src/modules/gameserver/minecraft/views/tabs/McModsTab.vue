@@ -8,6 +8,8 @@ import UploadButton from '@/components/ui/UploadButton.vue'
 import { useServer } from '../../composables/useServerContext'
 import { useTaskRunner } from '@/composables/useTask'
 import { mcModApi } from '@/api/minecraft'
+import { taskScope } from '@/api/tasks'
+import { logger } from '@/utils/logger'
 import { confirmDialog } from '@/utils/confirm'
 import { formatBytes, formatNumber } from '@/utils/format'
 import { toast } from '@/utils/toast'
@@ -20,14 +22,21 @@ const tab = ref('installed')
 const info = ref({ files: [], contentDir: '' })
 const uploading = ref(false)
 const uploadPct = ref(0)
-const { state: task, track } = useTaskRunner()
+const log = logger('McModsTab')
+const { state: task, track, resume } = useTaskRunner()
 
 const load = () => supported.value && mcModApi.list(id.value, (d) => (info.value = d))
-onMounted(load)
+onMounted(() => {
+  log.debug('*****McModsTab*****')
+  load()
+  // 重新整理頁面後，接回後端還在進行的安裝
+  resume(taskScope.mods(id.value), { onDone: (t) => { toast.success(t.message || '安裝完成'); load() } })
+})
 
 // ---- 已安裝 ----
 function upload(file) {
   if (!file.name.toLowerCase().endsWith('.jar')) return toast.error('只能上傳 .jar 檔案')
+  log.info('上傳', file.name, formatBytes(file.size))
   uploading.value = true
   uploadPct.value = 0
   mcModApi.upload(id.value, file, load, {
@@ -63,6 +72,7 @@ function switchToSearch() {
 }
 
 function install(h) {
+  log.info('從 Modrinth 安裝', h.projectId, h.title)
   mcModApi.install(id.value, h.projectId, (d) =>
     track(d.taskId, { title: `安裝 ${h.title}`, onDone: (t) => { toast.success(t.message || '安裝完成'); load() } }))
 }
@@ -70,8 +80,8 @@ function install(h) {
 
 <template>
   <div v-if="!supported" class="card">
-    <EmptyState icon="puzzle" title="Vanilla 伺服器不支援模組或插件"
-                hint="想用模組請改用 Fabric / Forge / NeoForge，想用插件請改用 Paper。可以在「版本」分頁直接切換，地圖會保留。" />
+    <EmptyState icon="puzzle" title="Vanilla 不支援模組或插件"
+                hint="要用模組請改用 Fabric、Forge 或 NeoForge，要用插件請改用 Paper。可在「版本」分頁切換，地圖會保留。" />
   </div>
 
   <div v-else class="stack">
@@ -80,7 +90,7 @@ function install(h) {
       <button :class="{ on: tab === 'search' }" @click="switchToSearch">從 Modrinth 安裝</button>
     </nav>
 
-    <div v-if="task.active" class="card card-pad"><ProgressBar :percent="task.percent" :label="task.message || task.title" /></div>
+    <div v-if="task.active" class="card card-pad"><ProgressBar :percent="task.percent" :done="task.bytesDone" :total="task.bytesTotal" :speed="task.speed" :label="task.message || task.title" /></div>
 
     <!-- 已安裝 -->
     <section v-if="tab === 'installed'" class="card">
@@ -90,7 +100,7 @@ function install(h) {
         <UploadButton accept=".jar" :label="`上傳${kindLabel} (.jar)`" :disabled="uploading" @pick="upload" />
       </div>
       <div v-if="uploading" class="prog"><ProgressBar :percent="uploadPct" :label="`上傳中 ${uploadPct}%`" /></div>
-      <EmptyState v-if="!info.files.length" icon="puzzle" :title="`還沒有安裝任何${kindLabel}`" :hint="`上傳 .jar 檔，或到「從 Modrinth 安裝」搜尋。變更後需重新啟動伺服器才會生效。`" />
+      <EmptyState v-if="!info.files.length" icon="puzzle" :title="`還沒有安裝任何${kindLabel}`" :hint="`上傳 .jar，或到「從 Modrinth 安裝」搜尋。變更後需重新啟動伺服器。`" />
       <div v-else class="table-wrap">
         <table class="table">
           <thead><tr><th>啟用</th><th>名稱</th><th>版本</th><th>大小</th><th /></tr></thead>
@@ -113,10 +123,10 @@ function install(h) {
     <!-- Modrinth -->
     <section v-else class="stack">
       <form class="row" @submit.prevent="search(false)">
-        <input v-model="query" class="input grow" :placeholder="`搜尋${kindLabel}（留空顯示最熱門）`" />
+        <input v-model="query" class="input grow" :placeholder="`搜尋${kindLabel}（留空顯示熱門）`" />
         <button class="btn sm" type="submit" :disabled="searching"><AppIcon name="search" :size="15" /> 搜尋</button>
       </form>
-      <p class="muted small">只會列出支援 {{ server.typeName }} {{ server.mcVersion }} 的項目，並自動安裝必要的相依模組。</p>
+      <p class="muted small">只列出支援 {{ server.typeName }} {{ server.mcVersion }} 的項目，必要的相依項目會一併安裝。</p>
 
       <div v-if="hits.length" class="hits">
         <article v-for="h in hits" :key="h.projectId" class="card hit">
@@ -130,7 +140,7 @@ function install(h) {
           <button class="btn sm soft" :disabled="task.active" @click="install(h)"><AppIcon name="download" :size="14" /> 安裝</button>
         </article>
       </div>
-      <div v-else-if="searched && !searching" class="card"><EmptyState icon="search" title="找不到符合的項目" hint="換個關鍵字，或確認這個版本是否已有人發布。" /></div>
+      <div v-else-if="searched && !searching" class="card"><EmptyState icon="search" title="找不到符合的項目" hint="換個關鍵字試試。" /></div>
       <div v-if="hits.length < total" class="row" style="justify-content:center">
         <button class="btn ghost sm" :disabled="searching" @click="search(true)">載入更多</button>
       </div>

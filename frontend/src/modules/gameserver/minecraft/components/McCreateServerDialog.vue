@@ -5,6 +5,9 @@ import VersionPicker from './VersionPicker.vue'
 import JavaRequirementNotice from './JavaRequirementNotice.vue'
 import { mcServerApi } from '@/api/minecraft'
 import { toast } from '@/utils/toast'
+import { logger } from '@/utils/logger'
+
+const log = logger('McCreateServerDialog')
 
 const props = defineProps({ modelValue: Boolean })
 const emit = defineEmits(['update:modelValue', 'created'])
@@ -17,6 +20,7 @@ const saving = ref(false)
 function submit() {
   if (!form.name.trim()) return toast.error('請輸入伺服器名稱')
   if (!pick.value.mcVersion) return toast.error('請選擇 Minecraft 版本')
+  log.info('新增伺服器', form.name.trim(), pick.value.type, pick.value.mcVersion)
   saving.value = true
   mcServerApi.create(
     {

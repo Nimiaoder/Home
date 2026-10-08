@@ -7,6 +7,8 @@ import com.liu.dev.gameserver.minecraft.server.McServer;
 import com.liu.dev.gameserver.minecraft.version.ServerType;
 import com.liu.dev.gameserver.support.path.SafePaths;
 import com.liu.dev.gameserver.support.task.TaskService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Files;
@@ -19,6 +21,8 @@ import java.util.Set;
 /** 從 Modrinth 搜尋並安裝模組 / 插件（自動挑選符合伺服器版本與 loader 的最新正式版，並安裝必要相依項目）。 */
 @Service
 public class ModrinthService {
+
+    private static final Logger log = LoggerFactory.getLogger(ModrinthService.class);
 
     private static final int MAX_DEPTH = 2;
 
@@ -113,10 +117,14 @@ public class ModrinthService {
         if (Files.exists(target) || Files.exists(dir.resolve(fileName + ".disabled"))) {
             // 已安裝，仍要檢查相依
         } else {
-            final String shown = fileName;
+            log.info("正在下載{}.....至{}", fileName, target);
+            ctx.progress(-1, "下載 " + fileName);
             client.download(file.path("url").asText(), target, file.path("hashes").path("sha1").asText(null),
-                    (done, total) -> ctx.progress(total > 0 ? (int) (done * 90 / total) : -1,
-                            "下載 " + shown + "　" + String.format("%.1f MB", done / 1024.0 / 1024.0)));
+                    (done, total) -> {
+                        ctx.transfer(done, total);
+                        ctx.progress(total > 0 ? (int) (done * 90 / total) : -1, null);
+                    });
+            ctx.clearTransfer();
             installed.add(fileName);
         }
 

@@ -2,6 +2,10 @@
 import { games } from './games'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import { logger } from '@/utils/logger'
+
+const log = logger('GameServerView')
+log.debug('*****GameServerView*****')
 </script>
 
 <template>
@@ -21,8 +25,8 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 
 <style scoped>
 .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
-.game { display: flex; gap: 16px; align-items: center; padding: 22px; transition: transform .15s, box-shadow .15s, border-color .15s; }
-.game:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 10px 28px rgba(14, 124, 102, .12); }
+.game { display: flex; gap: 16px; align-items: center; padding: 22px; transition: border-color .15s; }
+.game:hover { border-color: var(--accent); }
 .ico { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); flex: none; }
 .game strong { font-size: 18px; }
 </style>

@@ -3,7 +3,7 @@ export const games = [
   {
     id: 'minecraft',
     name: 'Minecraft',
-    desc: 'Java 版伺服器：多個伺服器、版本管理、地圖、模組與即時主控台',
+    desc: 'Java 版伺服器管理',
     icon: 'cube',
     to: { name: 'mc-servers' }
   }

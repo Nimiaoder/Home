@@ -7,6 +7,10 @@ import { mcServerApi } from '@/api/minecraft'
 import { formatDuration } from '@/utils/format'
 import { toast } from '@/utils/toast'
 import { statusOf } from '../../constants'
+import { logger } from '@/utils/logger'
+
+const log = logger('McOverviewTab')
+log.debug('*****McOverviewTab*****')
 
 const { server, reload } = useServer()
 const rt = computed(() => server.value.runtime)
@@ -15,6 +19,7 @@ const address = computed(() => `${location.hostname}:${server.value.port}`)
 const status = computed(() => statusOf(server.value))
 
 function acceptEula() {
+  log.info('同意 EULA', server.value.name)
   mcServerApi.acceptEula(server.value.id, reload, { showSuccess: true })
 }
 async function copy() {

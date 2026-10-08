@@ -1,7 +1,6 @@
 package com.liu.dev.gameserver.minecraft.java;
 
 import com.liu.dev.common.BusinessException;
-import com.liu.dev.config.AppProperties;
 import com.liu.dev.gameserver.minecraft.storage.MinecraftPaths;
 import com.liu.dev.gameserver.support.cache.TtlCache;
 import com.liu.dev.gameserver.support.http.HttpFetcher;
@@ -12,7 +11,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
@@ -25,8 +23,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Java 環境：偵測本機已安裝的 Java、依 Minecraft 版本自動挑選、並可從 Adoptium 下載 Temurin 到 {base}/java/。
- * （Minecraft 26.1 起需要 Java 25，而一般 NAS 上多半只有 Java 17/21，所以這個功能很重要。）
+ * Java 環境：只偵測 {base}/java/ 底下的 Java（不掃描系統或其他目錄），
+ * 依 Minecraft 版本自動挑選，並可從 Adoptium 下載 Temurin 到 {base}/java/。
  */
 @Service
 public class JavaRuntimeService {
@@ -41,40 +39,29 @@ public class JavaRuntimeService {
     public record JavaChoice(String path, int major, String version) {}
 
     private final MinecraftPaths paths;
-    private final AppProperties props;
     private final HttpFetcher http;
     private final TtlCache<String, List<JavaInfo>> cache = new TtlCache<>(60 * 1000L);
 
-    public JavaRuntimeService(MinecraftPaths paths, AppProperties props, HttpFetcher http) {
+    public JavaRuntimeService(MinecraftPaths paths, HttpFetcher http) {
         this.paths = paths;
-        this.props = props;
         this.http = http;
     }
 
     public List<JavaInfo> list(boolean refresh) {
-        if (refresh) cache.clear();
+        if (refresh) {
+            log.debug("重新掃描 Java");
+            cache.clear();
+        }
         return cache.get("list", this::scan);
     }
 
     // ---------------------------------------------------------------- 偵測
 
+    /** 只掃描 {base}/java/，不看系統的 JAVA_HOME、PATH 或其他目錄。 */
     private List<JavaInfo> scan() {
         Set<Path> exes = new LinkedHashSet<>();
+        log.debug("掃描 Java 目錄：{}", paths.java());
         scanDir(paths.java(), 3, exes);
-        List<String> dirs = props.minecraft() == null || props.minecraft().javaSearchDirs() == null
-                ? List.of() : props.minecraft().javaSearchDirs();
-        for (String d : dirs) {
-            if (StringUtils.hasText(d)) scanDir(Paths.get(d.trim()), 4, exes);
-        }
-        addExe(exes, Paths.get(System.getProperty("java.home", ""), "bin", "java"));
-        String javaHome = System.getenv("JAVA_HOME");
-        if (StringUtils.hasText(javaHome)) addExe(exes, Paths.get(javaHome, "bin", "java"));
-        String pathEnv = System.getenv("PATH");
-        if (pathEnv != null) {
-            for (String dir : pathEnv.split(File.pathSeparator)) {
-                if (StringUtils.hasText(dir)) addExe(exes, Paths.get(dir, "java"));
-            }
-        }
 
         Map<Path, JavaInfo> byReal = new LinkedHashMap<>();
         for (Path exe : exes) {
@@ -90,6 +77,7 @@ public class JavaRuntimeService {
         }
         List<JavaInfo> out = new ArrayList<>(byReal.values());
         out.sort(Comparator.comparingInt(JavaInfo::major).thenComparing(JavaInfo::path));
+        log.info("在 {} 找到 {} 個 Java", paths.java(), out.size());
         return out;
     }
 
@@ -107,10 +95,6 @@ public class JavaRuntimeService {
         } catch (IOException | SecurityException ignored) {
             // 沒權限的資料夾直接略過
         }
-    }
-
-    private void addExe(Set<Path> out, Path exe) {
-        if (Files.isRegularFile(exe) && Files.isExecutable(exe)) out.add(exe);
     }
 
     /** 執行 java -version 取得版本；無法執行回傳 null。 */
@@ -162,8 +146,10 @@ public class JavaRuntimeService {
             }
         }
         if (best == null) {
+            log.warn("{} 內沒有 Java {} 以上的版本", paths.java(), requiredMajor);
             throw new BusinessException("找不到 Java " + requiredMajor + " 或更新的版本，請到「資源庫 → Java 環境」下載安裝");
         }
+        log.info("選用 Java {}（{}），需求 Java {} 以上", best.major(), best.path(), requiredMajor);
         return new JavaChoice(best.path(), best.major(), best.version());
     }
 
@@ -185,11 +171,15 @@ public class JavaRuntimeService {
         try {
             Files.createDirectories(paths.tmp());
             String url = "https://api.adoptium.net/v3/binary/latest/" + major + "/ga/linux/" + arch + "/jre/hotspot/normal/eclipse";
-            ctx.progress(1, "下載 Java " + major + "…");
-            http.download(url, tgz, null, null, (done, total) -> ctx.progress(
-                    total > 0 ? (int) (done * 85 / total) : -1,
-                    "下載 Java " + major + "　" + String.format("%.0f MB", done / 1024.0 / 1024.0)));
+            log.info("正在下載Java {}.....至{}", major, tgz);
+            ctx.progress(1, "下載 Java " + major);
+            http.download(url, tgz, null, null, (done, total) -> {
+                ctx.transfer(done, total);
+                ctx.progress(total > 0 ? (int) (done * 85 / total) : -1, null);
+            });
+            ctx.clearTransfer();
 
+            log.info("正在解壓縮 {} 至 {}", tgz, dest);
             ctx.progress(88, "解壓縮…");
             FileTool.deleteRecursively(dest);
             Files.createDirectories(dest);
@@ -202,9 +192,11 @@ public class JavaRuntimeService {
             }
             dest.resolve("bin").resolve("java").toFile().setExecutable(true);
             cache.clear();
+            log.info("Java {} 安裝完成：{}", major, dest);
             ctx.progress(100, "Java " + major + " 安裝完成");
         } catch (IOException e) {
             cleanup(dest);
+            log.error("安裝 Java {} 失敗", major, e);
             throw new BusinessException("安裝 Java 失敗：" + FileTool.msg(e));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -230,6 +222,7 @@ public class JavaRuntimeService {
         Path rel = root.relativize(exe);
         if (rel.getNameCount() < 1) throw new BusinessException("路徑不合法");
         try {
+            log.info("移除 Java：{}", root.resolve(rel.getName(0)));
             FileTool.deleteRecursively(root.resolve(rel.getName(0)));
             cache.clear();
         } catch (IOException e) {

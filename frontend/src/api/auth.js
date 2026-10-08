@@ -5,8 +5,3 @@ export const authApi = {
   login: (body, cb, opt) => post('/api/auth/login', body, cb, opt),
   me: (cb, opt) => get('/api/auth/me', null, cb, opt)
 }
-
-export const demoApi = {
-  hello: (cb, opt) => get('/api/demo/hello', null, cb, opt),
-  admin: (cb, opt) => get('/api/demo/admin', null, cb, opt)
-}

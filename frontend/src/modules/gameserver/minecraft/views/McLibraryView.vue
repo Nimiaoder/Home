@@ -4,6 +4,10 @@ import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import LibraryVersions from '../components/LibraryVersions.vue'
 import LibraryJava from '../components/LibraryJava.vue'
+import { logger } from '@/utils/logger'
+
+const log = logger('McLibraryView')
+log.debug('*****McLibraryView*****')
 
 // 資源庫：跨伺服器共用的資源（核心版本、Java）。分頁以 ?tab= 記在網址，方便從其他頁面直接連過來。
 const route = useRoute()

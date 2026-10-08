@@ -9,6 +9,10 @@ import { confirmDialog } from '@/utils/confirm'
 import { toast } from '@/utils/toast'
 import { COMMON_PROPERTIES, MANAGED_KEYS } from '../../propertySchema'
 import { G1_FLAGS, isAlive } from '../../constants'
+import { logger } from '@/utils/logger'
+
+const log = logger('McSettingsTab')
+log.debug('*****McSettingsTab*****')
 
 const router = useRouter()
 const { server, id, reload } = useServer()
@@ -92,6 +96,7 @@ async function removeServer() {
     confirmText: '刪除', danger: true
   })
   if (!ok) return
+  log.info('刪除伺服器', server.value.name, '連同檔案：', checked)
   mcServerApi.remove(id.value, checked, () => router.replace({ name: 'mc-servers' }), { showSuccess: true })
 }
 </script>

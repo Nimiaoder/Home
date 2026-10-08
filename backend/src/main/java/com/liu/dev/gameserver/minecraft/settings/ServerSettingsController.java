@@ -3,6 +3,8 @@ package com.liu.dev.gameserver.minecraft.settings;
 import com.liu.dev.common.ApiResponse;
 import com.liu.dev.gameserver.minecraft.server.McServer;
 import com.liu.dev.gameserver.minecraft.server.McServerService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,6 +15,8 @@ import java.util.Map;
 @RequestMapping("/api/minecraft/servers/{id}/properties")
 @PreAuthorize("hasRole('ADMIN')")
 public class ServerSettingsController {
+
+    private static final Logger log = LoggerFactory.getLogger(ServerSettingsController.class);
 
     /** values：要更新的 key → value。 */
     public record UpdateRequest(Map<String, String> values) {}
@@ -27,12 +31,14 @@ public class ServerSettingsController {
 
     @GetMapping
     public ApiResponse<Map<String, String>> read(@PathVariable long id) {
+        log.debug("*****ServerSettingsController.read*****");
         McServer s = servers.require(id);
         return ApiResponse.ok(properties.read(s.getDirName()));
     }
 
     @PostMapping
     public ApiResponse<Void> update(@PathVariable long id, @RequestBody UpdateRequest req) {
+        log.debug("*****ServerSettingsController.update*****");
         McServer s = servers.require(id);
         if (req.values() == null || req.values().isEmpty()) return ApiResponse.ok("沒有需要儲存的變更", null);
         properties.update(s.getDirName(), req.values());

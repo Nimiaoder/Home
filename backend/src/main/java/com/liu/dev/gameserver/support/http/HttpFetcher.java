@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.liu.dev.common.BusinessException;
 import com.liu.dev.config.AppProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -28,6 +30,7 @@ import java.util.function.BiConsumer;
 @Component
 public class HttpFetcher {
 
+    private static final Logger log = LoggerFactory.getLogger(HttpFetcher.class);
     private static final String DEFAULT_UA = "Home-MinecraftManager/1.0";
 
     private final HttpClient client = HttpClient.newBuilder()
@@ -52,6 +55,7 @@ public class HttpFetcher {
     }
 
     public String getString(String url) {
+        log.debug("GET {}", url);
         HttpRequest req = HttpRequest.newBuilder(URI.create(url))
                 .header("User-Agent", userAgent)
                 .header("Accept", "application/json, text/xml, */*")
@@ -60,10 +64,12 @@ public class HttpFetcher {
         try {
             HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (res.statusCode() / 100 != 2) {
+                log.warn("GET {} 回應 {}", url, res.statusCode());
                 throw new BusinessException("遠端伺服器回應 " + res.statusCode() + "（" + host(url) + "）");
             }
             return res.body();
         } catch (IOException e) {
+            log.warn("無法連線到 {}：{}", url, e.getMessage());
             throw new BusinessException("無法連線到 " + host(url) + "，請確認伺服器可連外網路");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -81,6 +87,8 @@ public class HttpFetcher {
     public void download(String url, Path target, String hashAlgo, String expectedHash,
                          BiConsumer<Long, Long> progress) {
         Path part = target.resolveSibling(target.getFileName() + ".part");
+        long startedAt = System.currentTimeMillis();
+        log.info("正在下載{}.....至{}", url, target);
         try {
             Files.createDirectories(target.toAbsolutePath().getParent());
             HttpRequest req = HttpRequest.newBuilder(URI.create(url))
@@ -90,9 +98,11 @@ public class HttpFetcher {
             HttpResponse<InputStream> res = client.send(req, HttpResponse.BodyHandlers.ofInputStream());
             if (res.statusCode() / 100 != 2) {
                 res.body().close();
+                log.warn("下載 {} 失敗，遠端回應 {}", url, res.statusCode());
                 throw new BusinessException("下載失敗：遠端伺服器回應 " + res.statusCode() + "（" + host(url) + "）");
             }
             long total = res.headers().firstValueAsLong("Content-Length").orElse(-1);
+            log.debug("遠端回應 {}，檔案大小 {} bytes", res.statusCode(), total);
             MessageDigest md = (hashAlgo != null && StringUtils.hasText(expectedHash))
                     ? MessageDigest.getInstance(javaAlgo(hashAlgo)) : null;
             try (InputStream in = res.body(); OutputStream out = Files.newOutputStream(part)) {
@@ -108,15 +118,19 @@ public class HttpFetcher {
             }
             if (md != null && !HexFormat.of().formatHex(md.digest()).equalsIgnoreCase(expectedHash.trim())) {
                 Files.deleteIfExists(part);
+                log.warn("下載檔案的 {} 雜湊驗證失敗：{}", hashAlgo, target);
                 throw new BusinessException("下載檔案的雜湊驗證失敗，請重試");
             }
             Files.move(part, target, StandardCopyOption.REPLACE_EXISTING);
+            log.info("下載完成：{}（{} bytes，耗時 {} ms）", target, Files.size(target), System.currentTimeMillis() - startedAt);
         } catch (IOException e) {
             deleteQuietly(part);
+            log.error("下載 {} 時發生 I/O 錯誤", url, e);
             throw new BusinessException("下載失敗：" + host(url) + "（" + e.getMessage() + "）");
         } catch (InterruptedException e) {
             deleteQuietly(part);
             Thread.currentThread().interrupt();
+            log.warn("下載 {} 已被中斷", url);
             throw new BusinessException("下載已被中斷");
         } catch (NoSuchAlgorithmException e) {
             throw new BusinessException("不支援的雜湊演算法：" + hashAlgo);

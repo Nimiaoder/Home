@@ -1,13 +1,19 @@
 <script setup>
-import { useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import AppIcon from '@/components/ui/AppIcon.vue'
+import { logger } from '@/utils/logger'
 
-// 登入後所有頁面共用的外框：頂部列 + 內容區
+// 登入後所有頁面共用的外框：頂部列 + 內容區。左上角顯示目前頁面（取最內層有 meta.title 的路由）
+const log = logger('AppShell')
 const auth = useAuthStore()
+const route = useRoute()
 const router = useRouter()
+const title = computed(() => [...route.matched].reverse().find((r) => r.meta.title)?.meta.title || '主頁')
 
 function logout() {
+  log.info('使用者登出', auth.user?.username)
   auth.logout()
   router.replace({ name: 'login' })
 }
@@ -16,7 +22,7 @@ function logout() {
 <template>
   <div class="shell">
     <header class="bar">
-      <RouterLink :to="{ name: 'home' }" class="brand">Dev Console</RouterLink>
+      <RouterLink :to="{ name: 'home' }" class="brand" title="回到主頁">{{ title }}</RouterLink>
       <div class="who">
         <span class="avatar">{{ auth.user?.nickname?.slice(0, 1) }}</span>
         <span class="name">{{ auth.user?.nickname }}</span>

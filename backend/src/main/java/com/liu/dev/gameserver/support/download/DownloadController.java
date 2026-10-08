@@ -3,6 +3,8 @@ package com.liu.dev.gameserver.support.download;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.liu.dev.common.ApiResponse;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,6 +24,8 @@ import java.util.Optional;
 @RequestMapping("/api/dl")
 public class DownloadController {
 
+    private static final Logger log = LoggerFactory.getLogger(DownloadController.class);
+
     private final DownloadService downloads;
     private final ObjectMapper mapper;
 
@@ -32,6 +36,7 @@ public class DownloadController {
 
     @GetMapping("/{ticket}")
     public void download(@PathVariable String ticket, HttpServletResponse res) throws IOException {
+        log.debug("*****DownloadController.download*****");
         Optional<DownloadSource> found = downloads.consume(ticket);
         if (found.isEmpty()) {
             res.setStatus(404);

@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
 import { storage } from '@/utils/storage'
 import { authApi } from '@/api/auth'
+import { logger } from '@/utils/logger'
+
+const log = logger('auth')
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -19,6 +22,7 @@ export const useAuthStore = defineStore('auth', {
         (detail) => {
           this.token = detail.token
           this.user = detail.user
+          log.info('登入成功', detail.user?.username, detail.user?.role)
           storage.setToken(detail.token)
           storage.setUser(detail.user)
           onSuccess?.()
@@ -27,6 +31,7 @@ export const useAuthStore = defineStore('auth', {
       )
     },
     logout() {
+      log.info('清除登入狀態')
       this.token = ''
       this.user = null
       storage.clear()
