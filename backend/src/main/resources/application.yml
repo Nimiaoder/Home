@@ -1,0 +1,37 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: dev-backend
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.mariadb.jdbc.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update        # 正式環境建議改 validate 並用 sql/schema.sql 管理
+    properties:
+      hibernate.dialect: org.hibernate.dialect.MariaDBDialect
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expire-minutes: ${JWT_EXPIRE_MINUTES:120}
+  admin:
+    username: ${ADMIN_USERNAME:}
+    password: ${ADMIN_PASSWORD:}
+    nickname: ${ADMIN_NICKNAME:管理員}
+  cors:
+    origins: ${CORS_ORIGINS:http://localhost:5173}
+  minecraft:
+    # 所有 Minecraft 相關檔案的根目錄（servers/ library/ backups/ java/ tmp/ 都在底下）
+    base-dir: ${MC_BASE_DIR:/volume1/LiuChenWei/Home/GameServer/Minecraft}
+    # 額外搜尋 Java 的位置（逗號分隔）；<base-dir>/java 一律會被搜尋
+    java-search-dirs: ${MC_JAVA_SEARCH_DIRS:/usr/lib/jvm,/usr/java,/opt/java,/var/packages}
+    stop-timeout-seconds: ${MC_STOP_TIMEOUT:60}
+    console-buffer-lines: 2000
+    # PaperMC 等服務要求 User-Agent 帶聯絡資訊，請改成自己的網址或 Email
+    user-agent: ${MC_USER_AGENT:Home-MinecraftManager/1.0 (https://github.com/your-name/home)}
