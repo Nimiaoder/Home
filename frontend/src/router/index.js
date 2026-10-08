@@ -7,6 +7,7 @@ const log = logger('router')
 
 const routes = [
   { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { public: true, title: '登入' } },
+  { path: '/register', name: 'register', component: () => import('@/views/RegisterView.vue'), meta: { public: true, title: '註冊' } },
   {
     // 登入後的頁面都放在 AppShell（共用頂部列）底下
     path: '/',
@@ -17,7 +18,8 @@ const routes = [
       ...gameServerRoutes
     ]
   },
-  { path: '/:pathMatch(.*)*', redirect: '/' }
+  // 任何未定義路徑：未登入 → login；已登入 → 主頁
+  { path: '/:pathMatch(.*)*', name: 'not-found', redirect: () => ({ name: useAuthStore().isLoggedIn ? 'home' : 'login' }) }
 ]
 
 const router = createRouter({ history: createWebHistory(), routes })
@@ -27,9 +29,13 @@ router.beforeEach((to, from) => {
   const auth = useAuthStore()
   if (!to.meta.public && !auth.isLoggedIn) {
     log.info('尚未登入，導向登入頁', to.fullPath)
-    return { name: 'login', query: { redirect: to.fullPath } }
+    // 只有已知頁面才帶 redirect，未知路徑直接到登入頁
+    return to.matched.length && to.fullPath !== '/'
+      ? { name: 'login', query: { redirect: to.fullPath } }
+      : { name: 'login' }
   }
-  if (to.name === 'login' && auth.isLoggedIn) return { name: 'home' }
+  // 已登入時進入登入／註冊頁 → 主頁
+  if (to.meta.public && auth.isLoggedIn) return { name: 'home' }
   // 角色限制：任何一層 route 設了 meta.roles 且目前角色不在其中，就回首頁
   const role = auth.user?.role
   if (to.matched.some((r) => r.meta.roles && !r.meta.roles.includes(role))) {

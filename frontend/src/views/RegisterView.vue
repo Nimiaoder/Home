@@ -1,69 +1,86 @@
 <script setup>
-import { ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { authApi } from '@/api/auth'
 import { toast } from '@/utils/toast'
 import { logger } from '@/utils/logger'
 
-const log = logger('LoginView')
-log.debug('*****LoginView*****')
+const log = logger('RegisterView')
+log.debug('*****RegisterView*****')
 
-const auth = useAuthStore()
-const route = useRoute()
 const router = useRouter()
 
 const username = ref('')
+const nickname = ref('')
 const password = ref('')
+const confirm = ref('')
 const showPwd = ref(false)
 const loading = ref(false)
+const enabled = ref(true)   // 由系統參數決定，載入後更新
+
+onMounted(() => {
+  authApi.registerEnabled((v) => (enabled.value = !!v), { showError: false })
+})
 
 function submit() {
-  if (!username.value.trim() || !password.value) {
-    toast.error('請輸入帳號與密碼')
-    return
-  }
-  log.info('送出登入', username.value.trim())
+  const u = username.value.trim()
+  if (!u || !password.value) return toast.error('請輸入帳號與密碼')
+  if (!/^[A-Za-z0-9_.-]{3,50}$/.test(u)) return toast.error('帳號需為 3~50 個英數字或 _ . -')
+  if (password.value.length < 6) return toast.error('密碼至少 6 個字元')
+  if (password.value !== confirm.value) return toast.error('兩次輸入的密碼不一致')
+  log.info('送出註冊', u)
   loading.value = true
-  auth.login(username.value.trim(), password.value, {
-    onSuccess: () => router.replace(route.query.redirect || '/'),
-    onFinally: () => (loading.value = false)
-  })
+  authApi.register(
+    { username: u, password: password.value, nickname: nickname.value.trim() },
+    () => router.replace({ name: 'login' }),
+    { showSuccess: true, onFinally: () => (loading.value = false) }
+  )
 }
 </script>
 
 <template>
   <main class="login">
     <section class="brand">
-      <div class="brand-mark">登入</div>
+      <div class="brand-mark">註冊</div>
       <div class="brand-copy">
         <h1>家用服務管理</h1>
-        <p>登入後使用你有權限的功能。</p>
+        <p>建立帳號後，由管理員視需要開通更多權限。</p>
       </div>
     </section>
 
     <section class="panel">
       <form class="card" @submit.prevent="submit" novalidate>
         <header>
-          <h2>登入</h2>
-          <p>輸入帳號密碼以繼續</p>
+          <h2>註冊帳號</h2>
+          <p>{{ enabled ? '填寫以下資料建立一般使用者帳號' : '目前未開放註冊帳號' }}</p>
         </header>
 
         <label class="field">
           <span>帳號</span>
-          <input v-model="username" type="text" autocomplete="username" autofocus placeholder="輸入帳號" />
+          <input v-model="username" type="text" autocomplete="username" autofocus placeholder="3~50 個英數字" :disabled="!enabled" />
+        </label>
+
+        <label class="field">
+          <span>暱稱（選填）</span>
+          <input v-model="nickname" type="text" autocomplete="nickname" placeholder="未填則同帳號" :disabled="!enabled" />
         </label>
 
         <label class="field">
           <span>密碼</span>
           <div class="pwd">
-            <input v-model="password" :type="showPwd ? 'text' : 'password'" autocomplete="current-password" placeholder="輸入密碼" />
+            <input v-model="password" :type="showPwd ? 'text' : 'password'" autocomplete="new-password" placeholder="至少 6 個字元" :disabled="!enabled" />
             <button type="button" class="eye" @click="showPwd = !showPwd">{{ showPwd ? '隱藏' : '顯示' }}</button>
           </div>
         </label>
 
-        <button class="btn submit" :disabled="loading">{{ loading ? '登入中…' : '登入' }}</button>
+        <label class="field">
+          <span>確認密碼</span>
+          <input v-model="confirm" :type="showPwd ? 'text' : 'password'" autocomplete="new-password" placeholder="再輸入一次密碼" :disabled="!enabled" />
+        </label>
 
-        <p class="switch">還沒有帳號？<RouterLink :to="{ name: 'register' }">註冊</RouterLink></p>
+        <button class="btn submit" :disabled="loading || !enabled">{{ loading ? '註冊中…' : '註冊' }}</button>
+
+        <p class="switch">已經有帳號？<RouterLink :to="{ name: 'login' }">返回登入</RouterLink></p>
       </form>
     </section>
   </main>

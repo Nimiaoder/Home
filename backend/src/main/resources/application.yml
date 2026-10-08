@@ -16,14 +16,15 @@ spring:
     properties:
       hibernate.dialect: org.hibernate.dialect.MariaDBDialect
 
+logging:
+  level:
+    root: INFO
+    com.liu.dev: DEBUG        # 專案程式的 debug log 也會印出
+
 app:
   jwt:
     secret: ${JWT_SECRET}
     expire-minutes: ${JWT_EXPIRE_MINUTES:120}
-  admin:
-    username: ${ADMIN_USERNAME:}
-    password: ${ADMIN_PASSWORD:}
-    nickname: ${ADMIN_NICKNAME:管理員}
   cors:
     origins: ${CORS_ORIGINS:http://localhost:5173}
   minecraft:

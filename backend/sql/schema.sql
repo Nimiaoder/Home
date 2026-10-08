@@ -45,3 +45,15 @@ CREATE TABLE IF NOT EXISTS `mc_version_log` (
     created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     KEY idx_mc_version_log_server (server_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================ 系統參數 ============================
+CREATE TABLE IF NOT EXISTS `sys_param` (
+    param_key   VARCHAR(100) NOT NULL PRIMARY KEY COMMENT '參數代碼',
+    param_value VARCHAR(500) NULL COMMENT '參數值',
+    description VARCHAR(255) NULL COMMENT '說明',
+    updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 是否開放註冊帳號（Y 開放 / N 關閉），預設關閉
+INSERT IGNORE INTO `sys_param` (param_key, param_value, description)
+VALUES ('REGISTER_ENABLED', 'N', '是否開放註冊帳號 Y/N');

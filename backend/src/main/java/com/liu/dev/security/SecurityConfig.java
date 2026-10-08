@@ -30,6 +30,8 @@ public class SecurityConfig {
     /** 不需要登入即可存取的路徑，之後要開放新路徑加在這裡。 */
     private static final String[] PUBLIC_PATHS = {
             "/api/auth/login",
+            "/api/auth/register",
+            "/api/auth/register-enabled",
             "/api/dl/*"          // 一次性下載票券（票券本身即憑證，見 DownloadController）
     };
 

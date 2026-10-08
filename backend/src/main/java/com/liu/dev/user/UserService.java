@@ -1,33 +1,27 @@
 package com.liu.dev.user;
 
 import com.liu.dev.common.BusinessException;
-import com.liu.dev.config.AppProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 import java.util.Optional;
 
 @Service
-public class UserService implements ApplicationRunner {
+public class UserService {
 
     private static final Logger log = LoggerFactory.getLogger(UserService.class);
 
     private final UserRepository userRepository;   // JPA
     private final UserJdbcDao userJdbcDao;         // 直接下 SQL
     private final PasswordEncoder passwordEncoder;
-    private final AppProperties props;
 
     public UserService(UserRepository userRepository, UserJdbcDao userJdbcDao,
-                       PasswordEncoder passwordEncoder, AppProperties props) {
+                       PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.userJdbcDao = userJdbcDao;
         this.passwordEncoder = passwordEncoder;
-        this.props = props;
     }
 
     /** 以 JPA 查詢 */
@@ -47,21 +41,17 @@ public class UserService implements ApplicationRunner {
         }
     }
 
-    /**
-     * 啟動時依 .env 的 ADMIN_USERNAME / ADMIN_PASSWORD 建立初始管理員（已存在則略過）。
-     * 想再建其他帳號：在這裡（或自訂 Runner）呼叫 register(...) 即可，並未對外開放任何 API。
-     */
-    @Override
-    public void run(ApplicationArguments args) {
-        var admin = props.admin();
-        if (!StringUtils.hasText(admin.username()) || !StringUtils.hasText(admin.password())) return;
-        if (userRepository.existsByUsername(admin.username())) return;
-        register(admin.username(), admin.password(), admin.nickname(), "ADMIN");
-        log.info("已建立初始管理員帳號：{}", admin.username());
+    /** 一般使用者自行註冊：角色固定為 USER，不接受前端指定角色。 */
+    public UserAccount registerUser(String username, String rawPassword, String nickname) {
+        String nick = (nickname == null || nickname.isBlank()) ? username : nickname.trim();
+        UserAccount u = register(username, rawPassword, nick, "USER");
+        log.info("新使用者註冊成功：{}", username);
+        return u;
     }
 
-    /** 私有註冊方法：只提供內部呼叫，密碼以 BCrypt 雜湊後儲存。（單一 save，由 JPA 自帶交易） */
+    /** 註冊方法：密碼以 BCrypt 雜湊後儲存。（單一 save，由 JPA 自帶交易） */
     private UserAccount register(String username, String rawPassword, String nickname, String role) {
+        log.debug("*****UserService.register***** username={}, role={}", username, role);
         if (userRepository.existsByUsername(username)) {
             throw new BusinessException("帳號已存在");
         }

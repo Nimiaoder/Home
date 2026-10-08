@@ -2,6 +2,7 @@ package com.liu.dev.auth;
 
 import com.liu.dev.common.BusinessException;
 import com.liu.dev.security.JwtService;
+import com.liu.dev.sysparam.SysParamService;
 import com.liu.dev.user.UserAccount;
 import com.liu.dev.user.UserService;
 import org.slf4j.Logger;
@@ -20,11 +21,14 @@ public class AuthService {
     private final AuthenticationManager authManager;
     private final JwtService jwtService;
     private final UserService userService;
+    private final SysParamService sysParamService;
 
-    public AuthService(AuthenticationManager authManager, JwtService jwtService, UserService userService) {
+    public AuthService(AuthenticationManager authManager, JwtService jwtService, UserService userService,
+                       SysParamService sysParamService) {
         this.authManager = authManager;
         this.jwtService = jwtService;
         this.userService = userService;
+        this.sysParamService = sysParamService;
     }
 
     public LoginResult login(LoginRequest req) {
@@ -42,6 +46,19 @@ public class AuthService {
                 .orElseThrow(() -> new BusinessException("帳號或密碼錯誤"));
         log.info("使用者 {} 登入成功（角色 {}）", u.getUsername(), u.getRole());
         return new LoginResult(jwtService.generate(u.getUsername()), jwtService.expireSeconds(), toInfo(u));
+    }
+
+    public boolean isRegisterEnabled() {
+        return sysParamService.getBoolean(SysParamService.REGISTER_ENABLED, false);
+    }
+
+    public UserInfo register(RegisterRequest req) {
+        log.info("使用者 {} 嘗試註冊", req.username());
+        if (!isRegisterEnabled()) {
+            log.warn("註冊失敗：系統未開放註冊（{}）", req.username());
+            throw new BusinessException("目前未開放註冊帳號");
+        }
+        return toInfo(userService.registerUser(req.username().trim(), req.password(), req.nickname()));
     }
 
     public UserInfo me(String username) {

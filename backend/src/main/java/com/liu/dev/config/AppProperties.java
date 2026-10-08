@@ -6,9 +6,8 @@ import java.util.List;
 
 /** 對應 application.yml 的 app.* 設定。 */
 @ConfigurationProperties(prefix = "app")
-public record AppProperties(Jwt jwt, Admin admin, Cors cors, Minecraft minecraft) {
+public record AppProperties(Jwt jwt, Cors cors, Minecraft minecraft) {
     public record Jwt(String secret, long expireMinutes) {}
-    public record Admin(String username, String password, String nickname) {}
     public record Cors(List<String> origins) {}
 
     /**

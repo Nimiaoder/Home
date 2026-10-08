@@ -9,6 +9,8 @@ export default defineConfig(({ mode }) => {
     resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
     server: {
       port: 5173,
+      host: true,          // 監聽 0.0.0.0：可用 localhost / 內網 IP / 對外 IP 存取
+      allowedHosts: true,
       // 開發時把 /api 轉發到後端，避免 CORS；後端網址在 .env.development 設定
       proxy: { '/api': { target: env.VITE_PROXY_TARGET || 'http://localhost:8080', changeOrigin: true } }
     }
